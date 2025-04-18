@@ -1,6 +1,4 @@
-# bplustree.py
 import graphviz
-import random
 from typing import List, Dict, Tuple, Optional, Union
 
 class BPlusTreeNode:
@@ -26,6 +24,8 @@ class BPlusTree:
             i = 0
             while i < len(node.keys) and key >= node.keys[i]:
                 i += 1
+            if i >= len(node.children):  # Safety check
+                return False
             node = node.children[i]
         
         # Search in the leaf node
@@ -38,6 +38,8 @@ class BPlusTree:
             i = 0
             while i < len(node.keys) and key >= node.keys[i]:
                 i += 1
+            if i >= len(node.children):  # Safety check
+                return None
             node = node.children[i]
         
         try:
@@ -123,34 +125,57 @@ class BPlusTree:
     def _delete(self, node: BPlusTreeNode, key) -> None:
         if node.is_leaf:
             # Delete from leaf node
-            idx = node.keys.index(key)
-            node.keys.pop(idx)
-            if node.values:  # Only if we're storing values
-                node.values.pop(idx)
+            try:
+                idx = node.keys.index(key)
+                node.keys.pop(idx)
+                if node.values and idx < len(node.values):  # Ensure idx is valid for values
+                    node.values.pop(idx)
+            except ValueError:
+                return  # Key not found in this leaf
         else:
             # Find the appropriate child
             idx = 0
             while idx < len(node.keys) and key >= node.keys[idx]:
                 idx += 1
             
-            self._delete(node.children[idx], key)
+            # Ensure we don't go out of bounds
+            if idx >= len(node.children):
+                return
+            
+            # Check if key exists in the subtree
+            if idx < len(node.keys) and key == node.keys[idx]:
+                # Key is in this internal node, find predecessor
+                predecessor = self._get_predecessor(node.children[idx])
+                node.keys[idx] = predecessor
+                self._delete(node.children[idx], predecessor)
+            else:
+                self._delete(node.children[idx], key)
             
             # Check if child needs merging or borrowing
             if len(node.children[idx].keys) < self.min_keys:
                 self._fill_child(node, idx)
 
+    def _get_predecessor(self, node: BPlusTreeNode):
+        """Get the largest key in the subtree rooted at node"""
+        while not node.is_leaf:
+            node = node.children[-1]
+        return node.keys[-1] if node.keys else None
+
     def _fill_child(self, parent: BPlusTreeNode, child_idx: int) -> None:
-        # Try to borrow from left sibling
+        """Ensure child at given index has enough keys"""
         if child_idx > 0 and len(parent.children[child_idx - 1].keys) > self.min_keys:
+            # Borrow from left sibling
             self._borrow_from_prev(parent, child_idx)
-        # Try to borrow from right sibling
         elif child_idx < len(parent.children) - 1 and len(parent.children[child_idx + 1].keys) > self.min_keys:
+            # Borrow from right sibling
             self._borrow_from_next(parent, child_idx)
-        # Merge with sibling if borrowing isn't possible
         else:
+            # Merge with a sibling
             if child_idx == len(parent.children) - 1:
+                # Merge with left sibling
                 self._merge(parent, child_idx - 1)
             else:
+                # Merge with right sibling
                 self._merge(parent, child_idx)
 
     def _borrow_from_prev(self, parent: BPlusTreeNode, child_idx: int) -> None:
@@ -164,7 +189,7 @@ class BPlusTree:
             child.keys.insert(0, borrowed_key)
             if borrowed_value is not None:
                 child.values.insert(0, borrowed_value)
-            parent.keys[child_idx - 1] = borrowed_key
+            parent.keys[child_idx - 1] = left_sibling.keys[-1] if left_sibling.keys else borrowed_key
         else:
             # Borrow from internal node
             borrowed_key = parent.keys[child_idx - 1]
@@ -184,7 +209,7 @@ class BPlusTree:
             child.keys.append(borrowed_key)
             if borrowed_value is not None:
                 child.values.append(borrowed_value)
-            parent.keys[child_idx] = right_sibling.keys[0]
+            parent.keys[child_idx] = right_sibling.keys[0] if right_sibling.keys else borrowed_key
         else:
             # Borrow from internal node
             borrowed_key = parent.keys[child_idx]
@@ -210,6 +235,10 @@ class BPlusTree:
         
         parent.children.pop(child_idx + 1)
 
+        # If parent is root and becomes empty
+        if parent == self.root and not parent.keys:
+            self.root = left_child
+
     def update(self, key, new_value) -> bool:
         """Update the value associated with a key. Returns True if successful."""
         node = self.root
@@ -217,6 +246,8 @@ class BPlusTree:
             i = 0
             while i < len(node.keys) and key >= node.keys[i]:
                 i += 1
+            if i >= len(node.children):  # Safety check
+                return False
             node = node.children[i]
         
         try:
@@ -236,6 +267,8 @@ class BPlusTree:
             i = 0
             while i < len(node.keys) and start_key > node.keys[i]:
                 i += 1
+            if i >= len(node.children):  # Safety check
+                return results
             node = node.children[i]
         
         # Traverse leaf nodes
@@ -256,6 +289,8 @@ class BPlusTree:
         
         # Find the leftmost leaf
         while not node.is_leaf:
+            if not node.children:  # Safety check
+                return results
             node = node.children[0]
         
         # Traverse all leaf nodes
@@ -266,42 +301,101 @@ class BPlusTree:
         
         return results
 
+    def validate_tree(self) -> bool:
+        """Check tree invariants"""
+        return self._validate_node(self.root)
+
+    def _validate_node(self, node: BPlusTreeNode) -> bool:
+        if node.is_leaf:
+            # Check leaf node properties
+            if len(node.keys) > self.max_keys or (node != self.root and len(node.keys) < self.min_keys):
+                return False
+            return True
+        
+        # Check internal node properties
+        if len(node.keys) > self.max_keys or (node != self.root and len(node.keys) < self.min_keys):
+            return False
+        
+        if len(node.children) != len(node.keys) + 1:
+            return False
+        
+        # Check keys are sorted
+        if node.keys != sorted(node.keys):
+            return False
+        
+        # Recursively validate children
+        for child in node.children:
+            if not self._validate_node(child):
+                return False
+        
+        return True
+
     def visualize_tree(self, filename: str = 'bplustree') -> None:
         """Generate a visualization of the B+ tree using Graphviz."""
-        dot = graphviz.Digraph(comment='B+ Tree')
-        self._add_nodes(dot, self.root)
-        self._add_edges(dot, self.root)
+        dot = graphviz.Digraph(comment='B+ Tree', node_attr={'shape': 'box'})
         
-        # Add links between leaf nodes
-        if self.root.is_leaf:
-            return
+        # Add nodes
+        nodes = [self.root]
+        while nodes:
+            node = nodes.pop(0)
+            
+            if node.is_leaf:
+                label = f"Leaf: {node.keys}"
+                if node.values:
+                    label += f"\nValues: {node.values}"
+            else:
+                label = f"Node: {node.keys}"
+                nodes.extend(node.children)
+            
+            dot.node(str(id(node)), label=label)
         
-        # Find the leftmost leaf
-        node = self.root
-        while not node.is_leaf:
-            node = node.children[0]
+        # Add edges
+        nodes = [self.root]
+        while nodes:
+            node = nodes.pop(0)
+            if not node.is_leaf:
+                for child in node.children:
+                    dot.edge(str(id(node)), str(id(child)))
+                    nodes.append(child)
         
-        # Add links between leaf nodes
-        while node.next:
-            dot.edge(str(id(node)), str(id(node.next)), style='dashed', constraint='false')
-            node = node.next
+        # Add leaf links
+        if not self.root.is_leaf:
+            # Find leftmost leaf
+            node = self.root
+            while not node.is_leaf:
+                if not node.children:  # Safety check
+                    break
+                node = node.children[0]
+            
+            # Add links between leaves
+            while node and node.next:
+                dot.edge(str(id(node)), str(id(node.next)), 
+                       style='dashed', constraint='false')
+                node = node.next
         
-        dot.render(filename, format='png', cleanup=True)
+        try:
+            dot.render(filename, format='png', cleanup=True)
+            print(f"Visualization saved as {filename}.png")
+        except Exception as e:
+            print(f"Visualization failed: {e}")
+            print("Text representation:")
+            self.print_tree()
 
-    def _add_nodes(self, dot, node: BPlusTreeNode) -> None:
-        """Recursively add nodes to the Graphviz object."""
-        if node.is_leaf:
-            label = '|'.join([f'<f{idx}> {key}' for idx, key in enumerate(node.keys)])
-            dot.node(str(id(node)), label=f'{{{label}}}', shape='record')
-        else:
-            label = '|'.join([f'<f{idx}> {key}' for idx, key in enumerate(node.keys)])
-            dot.node(str(id(node)), label=f'{{{label}}}', shape='record')
-            for child in node.children:
-                self._add_nodes(dot, child)
-
-    def _add_edges(self, dot, node: BPlusTreeNode) -> None:
-        """Add edges between nodes in the Graphviz object."""
-        if not node.is_leaf:
-            for i, child in enumerate(node.children):
-                dot.edge(f'{id(node)}:f{i}', f'{id(child)}')
-                self._add_edges(dot, child)
+    def print_tree(self) -> None:
+        """Print a text representation of the tree"""
+        nodes = [(self.root, 0)]
+        while nodes:
+            node, level = nodes.pop(0)
+            prefix = "  " * level
+            if node.is_leaf:
+                print(f"{prefix}Leaf: {node.keys}")
+                if node.values:
+                    print(f"{prefix}Values: {node.values}")
+            else:
+                print(f"{prefix}Node: {node.keys}")
+                for child in reversed(node.children):
+                    nodes.insert(0, (child, level + 1))
+            
+            # Show leaf links
+            if node.is_leaf and node.next:
+                print(f"{prefix}  -> Next leaf: {node.next.keys[:1]}...")
