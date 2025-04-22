@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lightweight DBMS</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+        }
+        .panel {
+            border: 1px solid #ccc;
+            padding: 10px;
+            width: 300px;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            overflow-x: auto;
+        }
+        button {
+            margin-top: 10px;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        select {
+            width: 100%;
+            padding: 5px;
+            margin-bottom: 10px;
+        }
+    </style>
+    <script>
+        async function loadTables() {
+            const response = await fetch("/tables");
+            const tables = await response.json();
+            const tableDropdown = document.getElementById("table-dropdown");
+            tableDropdown.innerHTML = "<option value=''>Select a table</option>";
+            tables.forEach(table => {
+                const option = document.createElement("option");
+                option.value = table;
+                option.textContent = table;
+                tableDropdown.appendChild(option);
+            });
+        }
+
+        async function loadTableDetails() {
+            const tableName = document.getElementById("table-dropdown").value;
+            if (!tableName) {
+                alert("Please select a table.");
+                return;
+            }
+            const response = await fetch(`/table/${tableName}`);
+            const table = await response.json();
+            document.getElementById("table-details").textContent = JSON.stringify(table, null, 2);
+            loadTableContents(tableName);
+        }
+
+        async function loadTableContents(tableName) {
+            const response = await fetch(`/table/${tableName}/contents`);
+            const records = await response.json();
+            const tableContents = document.getElementById("table-contents");
+            tableContents.innerHTML = JSON.stringify(records, null, 2);
+        }
+
+        async function createTable() {
+            const tableName = prompt("Enter table name:");
+            const columns = prompt("Enter columns (e.g., id:int,name:str):");
+            const primaryKey = prompt("Enter primary key column:");
+            if (!tableName || !columns || !primaryKey) {
+                alert("All fields are required.");
+                return;
+            }
+            const response = await fetch(`/table/create`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: tableName, columns, primary_key: primaryKey })
+            });
+            const result = await response.json();
+            alert(result.message);
+            loadTables();
+        }
+
+        async function deleteTable() {
+            const tableName = document.getElementById("table-dropdown").value;
+            if (!tableName) {
+                alert("Please select a table first.");
+                return;
+            }
+            const response = await fetch(`/table/${tableName}/delete`, { method: "DELETE" });
+            const result = await response.json();
+            alert(result.message);
+            loadTables();
+        }
+
+        async function insertRecord() {
+            const tableName = document.getElementById("table-dropdown").value;
+            if (!tableName) {
+                alert("Please select a table first.");
+                return;
+            }
+            const record = document.getElementById("record-input").value;
+            try {
+                const response = await fetch(`/table/${tableName}/insert`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: record
+                });
+                const result = await response.json();
+                alert(result.message);
+                loadTableContents(tableName);
+            } catch (error) {
+                alert("Error inserting record: " + error.message);
+            }
+        }
+
+        async function updateRecord() {
+            const tableName = document.getElementById("table-dropdown").value;
+            if (!tableName) {
+                alert("Please select a table first.");
+                return;
+            }
+            const primaryKey = prompt("Enter primary key of the record to update:");
+            const updates = prompt("Enter updates (e.g., name='New Name',age=30):");
+            if (!primaryKey || !updates) {
+                alert("Both primary key and updates are required.");
+                return;
+            }
+            const response = await fetch(`/table/${tableName}/update`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ primary_key: primaryKey, updates })
+            });
+            const result = await response.json();
+            alert(result.message);
+            loadTableContents(tableName);
+        }
+
+        async function deleteRecord() {
+            const tableName = document.getElementById("table-dropdown").value;
+            if (!tableName) {
+                alert("Please select a table first.");
+                return;
+            }
+            const primaryKey = prompt("Enter primary key of the record to delete:");
+            if (!primaryKey) {
+                alert("Primary key is required.");
+                return;
+            }
+            const response = await fetch(`/table/${tableName}/delete_record`, {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ primary_key: primaryKey })
+            });
+            const result = await response.json();
+            alert(result.message);
+            loadTableContents(tableName);
+        }
+
+        async function visualizeTable() {
+            const tableName = document.getElementById("table-dropdown").value;
+            if (!tableName) {
+                alert("Please select a table first.");
+                return;
+            }
+            const response = await fetch(`/table/${tableName}/visualize`);
+            const result = await response.json();
+            alert(result.message);
+        }
+
+        async function persistDatabase() {
+            const response = await fetch("/persist", { method: "POST" });
+            const result = await response.json();
+            alert(result.message);
+        }
+    </script>
+</head>
+<body onload="loadTables()">
+    <h1>Lightweight DBMS</h1>
+    <div class="container">
+        <div class="panel">
+            <h2>Tables</h2>
+            <select id="table-dropdown" onchange="loadTableDetails()"></select>
+            <button onclick="createTable()">Create Table</button>
+            <button onclick="deleteTable()">Delete Table</button>
+        </div>
+        <div class="panel">
+            <h2>Table Details</h2>
+            <pre id="table-details">Select a table to view details.</pre>
+            <h2>Table Contents</h2>
+            <pre id="table-contents">Select a table to view contents.</pre>
+        </div>
+        <div class="panel">
+            <h2>Actions</h2>
+            <textarea id="record-input" placeholder='{"column1": "value1", "column2": "value2"}' rows="5" style="width: 100%;"></textarea>
+            <button onclick="insertRecord()">Insert Record</button>
+            <button onclick="updateRecord()">Update Record</button>
+            <button onclick="deleteRecord()">Delete Record</button>
+            <button onclick="visualizeTable()">Visualize Index</button>
+            <button onclick="persistDatabase()">Persist Database</button>
+        </div>
+    </div>
+</body>
+</html>
