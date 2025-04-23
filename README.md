@@ -2,4 +2,6 @@
 1. go inside database folder
 2. pip install flask graphviz
 3. sudo apt update; sudo apt install graphviz
-4. Run python app.py 
+4. Run python app.py
+
+Note: After creating the database you have to click on connect DB 
