@@ -1,0 +1,6 @@
+// B+ Tree
+digraph {
+	node [shape=box]
+	125888473436656 [label="Leaf: [1]
+Values: [{'id': 1, 'name': 'Someone', 'age': 10}]"]
+}

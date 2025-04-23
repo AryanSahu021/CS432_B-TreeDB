@@ -3,209 +3,715 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lightweight DBMS</title>
+    <title>B+ Tree Database Management System</title>
     <style>
+        :root {
+            --primary-color: #2196F3;
+            --secondary-color: #1976D2;
+            --success-color: #4CAF50;
+            --error-color: #f44336;
+            --background-color: #f5f5f5;
+            --card-background: white;
+            --text-color: #333;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--background-color);
+            color: var(--text-color);
         }
-        h1, h2 {
-            color: #333;
+
+        .navbar {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
+
         .container {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 2rem;
+        }
+
+        .card {
+            background: var(--card-background);
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .database-section {
+            grid-column: span 12;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+        }
+
+        .operations-section {
+            grid-column: span 4;
+            transition: opacity 0.3s ease;
+        }
+
+        .operations-section {
+            opacity: 0.5;
+            pointer-events: none;
+            transition: all 0.3s ease;
+        }
+
+        .operations-section.enabled {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .content-section {
+            grid-column: span 8;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .input-group {
             display: flex;
-            gap: 20px;
+            gap: 0.5rem;
         }
-        .panel {
-            border: 1px solid #ccc;
-            padding: 10px;
-            width: 300px;
-        }
-        pre {
-            background: #f4f4f4;
-            padding: 10px;
-            overflow-x: auto;
-        }
-        button {
-            margin-top: 10px;
-            padding: 5px 10px;
-            cursor: pointer;
-        }
-        select {
+
+        input, select, textarea {
             width: 100%;
-            padding: 5px;
-            margin-bottom: 10px;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--secondary-color);
+        }
+
+        button:disabled,
+        select:disabled,
+        textarea:disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            margin-top: 1rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+
+        .alert {
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+
+        .alert {
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .alert-success {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #2e7d32;
+        }
+
+        .alert-error {
+            background-color: #ffebee;
+            color: #c62828;
+            border: 1px solid #c62828;
+        }
+
+        .alert-success {
+            background-color: #e8f5e9;
+            color: var(--success-color);
+            border: 1px solid var(--success-color);
+        }
+
+        .alert-error {
+            background-color: #ffebee;
+            color: var(--error-color);
+            border: 1px solid var(--error-color);
+        }
+
+        .database-status {
+            padding: 0.5rem;
+            margin-bottom: 1rem;
+            border-radius: 4px;
+            background-color: var(--background-color);
+        }
+
+        /* Add to your existing styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+        }
+
+        .modal-content {
+            position: relative;
+            margin: 2rem auto;
+            padding: 1rem;
+            background-color: var(--card-background);
+            border-radius: 8px;
+            max-width: 90%;
+            max-height: 90vh;
+            overflow: auto;
+        }
+
+        .modal img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-color);
+        }
+
+        .visualization-container {
+            margin-top: 1rem;
+            text-align: center;
         }
     </style>
+</head>
+<body>
+    <div class="navbar">
+        <h1>B+ Tree Database Management System</h1>
+    </div>
+
+    <div class="container">
+        <div class="database-section card">
+            <div class="form-group">
+                <label for="db-name">Database Name</label>
+                <div class="input-group">
+                    <input type="text" id="db-name" placeholder="Enter database name">
+                    <button onclick="createDatabase()">Create DB</button>
+                    <button onclick="connectDatabase()">Connect DB</button>
+                </div>
+            </div>
+            <div id="database-status" class="database-status"></div>
+        </div>
+
+        <div class="operations-section card">
+            <h2>Operations</h2>
+            
+            <div class="form-group">
+                <label>Table Selection</label>
+                <select id="table-dropdown" onchange="loadTableDetails()">
+                    <option value="">Select a table</option>
+                </select>
+            </div>
+
+            <h3>Table Operations</h3>
+            <div class="button-group">
+                <button onclick="showCreateTableDialog()">Create Table</button>
+                <button onclick="deleteTable()">Delete Table</button>
+            </div>
+
+            <h3>Record Operations</h3>
+            <div class="form-group">
+                <label>Record Data (JSON)</label>
+                <textarea id="record-input" rows="5" placeholder='{"column1": "value1", "column2": "value2"}'></textarea>
+            </div>
+            <div class="button-group">
+                <button onclick="insertRecord()">Insert</button>
+                <button onclick="showUpdateDialog()">Update</button>
+                <button onclick="showDeleteDialog()">Delete</button>
+            </div>
+
+            <h3>Database Actions</h3>
+            <div class="button-group">
+                <button onclick="visualizeTable()">Visualize Index</button>
+                <button onclick="persistDatabase()">Save Database</button>
+            </div>
+        </div>
+
+        <div class="content-section card">
+            <h2>Table Information</h2>
+            <div id="table-details"></div>
+            <div id="table-contents" class="table-container"></div>
+        </div>
+    </div>
+
+    <!-- Add after your existing container div -->
+    <div id="visualization-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeVisualizationModal()">&times;</span>
+            <div id="visualization-content"></div>
+        </div>
+    </div>
+
     <script>
-        async function loadTables() {
-            const response = await fetch("/tables");
-            const tables = await response.json();
-            const tableDropdown = document.getElementById("table-dropdown");
-            tableDropdown.innerHTML = "<option value=''>Select a table</option>";
-            tables.forEach(table => {
-                const option = document.createElement("option");
-                option.value = table;
-                option.textContent = table;
-                tableDropdown.appendChild(option);
+        // Add this function at the start of your script section
+        function showAlert(message, type) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.textContent = message;
+            
+            // Remove any existing alerts
+            document.querySelectorAll('.alert').forEach(alert => {
+                if (alert.parentElement !== document.getElementById('database-status')) {
+                    alert.remove();
+                }
             });
+            
+            // Insert alert at the top of the container
+            const container = document.querySelector('.container');
+            container.insertBefore(alertDiv, container.firstChild);
+            
+            // Remove alert after 5 seconds
+            setTimeout(() => alertDiv.remove(), 5000);
+        }
+
+        let currentDatabase = null;
+
+        function updateDatabaseStatus(dbName) {
+            const statusDiv = document.getElementById("database-status");
+            if (dbName) {
+                statusDiv.innerHTML = `<div class="alert alert-success">Connected to: ${dbName}</div>`;
+                document.getElementById("db-name").value = dbName;
+                enableOperations();
+            } else {
+                statusDiv.innerHTML = '<div class="alert alert-error">No database connected</div>';
+                disableOperations();
+            }
+        }
+
+        async function createDatabase() {
+            const dbName = document.getElementById("db-name").value;
+            if (!dbName) {
+                showAlert("Please enter a database name", "error");
+                return;
+            }
+            try {
+                const response = await fetch("/database/create", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name: dbName })
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    currentDatabase = result.database;
+                    showAlert(result.message, "success");
+                    updateDatabaseStatus(currentDatabase);
+                    await loadTables();
+                } else {
+                    showAlert(result.error, "error");
+                    updateDatabaseStatus(null);
+                }
+            } catch (error) {
+                showAlert("Error creating database", "error");
+                updateDatabaseStatus(null);
+            }
+        }
+
+        async function connectDatabase() {
+            const dbName = document.getElementById("db-name").value;
+            if (!dbName) {
+                showAlert("Please enter a database name", "error");
+                return;
+            }
+            try {
+                const response = await fetch("/database", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name: dbName })
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    currentDatabase = result.database;
+                    showAlert(result.message, "success");
+                    updateDatabaseStatus(currentDatabase);
+                    await loadTables();
+                } else {
+                    showAlert(result.error, "error");
+                    updateDatabaseStatus(null);
+                }
+            } catch (error) {
+                showAlert("Error connecting to database", "error");
+                updateDatabaseStatus(null);
+            }
+        }
+
+        function enableOperations() {
+            document.querySelectorAll('.operations-section button, .operations-section select, .operations-section textarea')
+                .forEach(element => element.removeAttribute('disabled'));
+            document.querySelector('.operations-section').style.opacity = '1';
+            document.querySelector('.operations-section').style.pointerEvents = 'auto';
+        }
+
+        function disableOperations() {
+            document.querySelectorAll('.operations-section button, .operations-section select, .operations-section textarea')
+                .forEach(element => element.setAttribute('disabled', 'true'));
+            document.querySelector('.operations-section').style.opacity = '0.5';
+            document.querySelector('.operations-section').style.pointerEvents = 'none';
+        }
+
+        async function loadTables() {
+            if (!currentDatabase) {
+                return;
+            }
+            try {
+                const response = await fetch("/tables");
+                if (!response.ok) {
+                    showAlert("Error loading tables", "error");
+                    return;
+                }
+                const tables = await response.json();
+                const tableDropdown = document.getElementById("table-dropdown");
+                tableDropdown.innerHTML = "<option value=''>Select a table</option>";
+                tables.forEach(table => {
+                    const option = document.createElement("option");
+                    option.value = table;
+                    option.textContent = table;
+                    tableDropdown.appendChild(option);
+                });
+            } catch (error) {
+                showAlert("Error loading tables", "error");
+            }
         }
 
         async function loadTableDetails() {
             const tableName = document.getElementById("table-dropdown").value;
-            if (!tableName) {
-                alert("Please select a table.");
-                return;
+            if (!tableName) return;
+
+            try {
+                const detailsResponse = await fetch(`/table/${tableName}`);
+                const details = await detailsResponse.json();
+                if (detailsResponse.ok) {
+                    document.getElementById("table-details").innerHTML = `
+                        <p><strong>Table Name:</strong> ${details.name}</p>
+                        <p><strong>Columns:</strong> ${JSON.stringify(details.columns, null, 2)}</p>
+                    `;
+
+                    const contentsResponse = await fetch(`/table/${tableName}/contents`);
+                    const contents = await contentsResponse.json();
+                    if (contentsResponse.ok) {
+                        displayTableData(contents);
+                    } else {
+                        showAlert("Error loading table contents", "error");
+                    }
+                } else {
+                    showAlert(details.error, "error");
+                }
+            } catch (error) {
+                showAlert("Error loading table details", "error");
             }
-            const response = await fetch(`/table/${tableName}`);
-            const table = await response.json();
-            document.getElementById("table-details").textContent = JSON.stringify(table, null, 2);
-            loadTableContents(tableName);
         }
 
-        async function loadTableContents(tableName) {
-            const response = await fetch(`/table/${tableName}/contents`);
-            const records = await response.json();
-            const tableContents = document.getElementById("table-contents");
-            tableContents.innerHTML = JSON.stringify(records, null, 2);
-        }
-
-        async function createTable() {
-            const tableName = prompt("Enter table name:");
-            const columns = prompt("Enter columns (e.g., id:int,name:str):");
-            const primaryKey = prompt("Enter primary key column:");
-            if (!tableName || !columns || !primaryKey) {
-                alert("All fields are required.");
+        function displayTableData(data) {
+            const contentDiv = document.getElementById("table-contents");
+            if (!Array.isArray(data) || data.length === 0) {
+                contentDiv.innerHTML = "<p>No records found</p>";
                 return;
             }
-            const response = await fetch(`/table/create`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name: tableName, columns, primary_key: primaryKey })
+
+            const columns = Object.keys(data[0]);
+            let html = '<table><thead><tr>';
+            columns.forEach(col => {
+                html += `<th>${col}</th>`;
             });
-            const result = await response.json();
-            alert(result.message);
-            loadTables();
+            html += '</tr></thead><tbody>';
+
+            data.forEach(record => {
+                html += '<tr>';
+                columns.forEach(col => {
+                    html += `<td>${record[col]}</td>`;
+                });
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            contentDiv.innerHTML = html;
+        }
+
+        function showCreateTableDialog() {
+            const name = prompt("Enter table name:");
+            if (!name) return;
+            
+            const columns = prompt("Enter columns (format: id:int,name:str,age:int):");
+            if (!columns) return;
+            
+            const primaryKey = prompt("Enter primary key column:");
+            if (!primaryKey) return;
+
+            createTable(name, columns, primaryKey);
+        }
+
+        async function createTable(name, columns, primaryKey) {
+            try {
+                const response = await fetch("/table/create", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name, columns, primary_key: primaryKey })
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    showAlert(result.message, "success");
+                    await loadTables();
+                    document.getElementById("table-dropdown").value = name;
+                    await loadTableDetails();
+                } else {
+                    showAlert(result.error, "error");
+                }
+            } catch (error) {
+                showAlert("Error creating table", "error");
+            }
         }
 
         async function deleteTable() {
             const tableName = document.getElementById("table-dropdown").value;
             if (!tableName) {
-                alert("Please select a table first.");
+                showAlert("Please select a table first", "error");
                 return;
             }
-            const response = await fetch(`/table/${tableName}/delete`, { method: "DELETE" });
-            const result = await response.json();
-            alert(result.message);
-            loadTables();
+
+            if (!confirm(`Are you sure you want to delete table '${tableName}'?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/table/${tableName}/delete`, {
+                    method: "DELETE"
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    showAlert(result.message, "success");
+                    await loadTables();
+                    document.getElementById("table-details").innerHTML = "";
+                    document.getElementById("table-contents").innerHTML = "";
+                } else {
+                    showAlert(result.error, "error");
+                }
+            } catch (error) {
+                showAlert("Error deleting table", "error");
+            }
         }
 
         async function insertRecord() {
             const tableName = document.getElementById("table-dropdown").value;
             if (!tableName) {
-                alert("Please select a table first.");
+                showAlert("Please select a table first", "error");
                 return;
             }
-            const record = document.getElementById("record-input").value;
+
+            const recordInput = document.getElementById("record-input").value;
             try {
+                const record = JSON.parse(recordInput);
                 const response = await fetch(`/table/${tableName}/insert`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: record
+                    body: JSON.stringify(record)
                 });
                 const result = await response.json();
-                alert(result.message);
-                loadTableContents(tableName);
+                if (response.ok) {
+                    showAlert(result.message, "success");
+                    await loadTableDetails();
+                } else {
+                    showAlert(result.error, "error");
+                }
             } catch (error) {
-                alert("Error inserting record: " + error.message);
+                showAlert("Invalid JSON format", "error");
             }
         }
 
-        async function updateRecord() {
+        function showUpdateDialog() {
             const tableName = document.getElementById("table-dropdown").value;
             if (!tableName) {
-                alert("Please select a table first.");
+                showAlert("Please select a table first", "error");
                 return;
             }
-            const primaryKey = prompt("Enter primary key of the record to update:");
-            const updates = prompt("Enter updates (e.g., name='New Name',age=30):");
-            if (!primaryKey || !updates) {
-                alert("Both primary key and updates are required.");
-                return;
+
+            const primaryKey = prompt("Enter primary key value:");
+            if (!primaryKey) return;
+
+            const updates = prompt("Enter updates (JSON format):");
+            if (!updates) return;
+
+            try {
+                const updatesObj = JSON.parse(updates);
+                updateRecord(tableName, primaryKey, updatesObj);
+            } catch (error) {
+                showAlert("Invalid JSON format", "error");
             }
-            const response = await fetch(`/table/${tableName}/update`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ primary_key: primaryKey, updates })
-            });
-            const result = await response.json();
-            alert(result.message);
-            loadTableContents(tableName);
         }
 
-        async function deleteRecord() {
+        async function updateRecord(tableName, primaryKey, updates) {
+            try {
+                const response = await fetch(`/table/${tableName}/update`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ primary_key: primaryKey, updates: updates })
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    showAlert(result.message, "success");
+                    await loadTableDetails();
+                } else {
+                    showAlert(result.error, "error");
+                }
+            } catch (error) {
+                showAlert("Error updating record", "error");
+            }
+        }
+
+        function showDeleteDialog() {
             const tableName = document.getElementById("table-dropdown").value;
             if (!tableName) {
-                alert("Please select a table first.");
+                showAlert("Please select a table first", "error");
                 return;
             }
-            const primaryKey = prompt("Enter primary key of the record to delete:");
-            if (!primaryKey) {
-                alert("Primary key is required.");
-                return;
+
+            const primaryKey = prompt("Enter primary key value to delete:");
+            if (!primaryKey) return;
+
+            deleteRecord(tableName, primaryKey);
+        }
+
+        async function deleteRecord(tableName, primaryKey) {
+            try {
+                const response = await fetch(`/table/${tableName}/delete_record`, {
+                    method: "DELETE",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ primary_key: primaryKey })
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    showAlert(result.message, "success");
+                    await loadTableDetails();
+                } else {
+                    showAlert(result.error, "error");
+                }
+            } catch (error) {
+                showAlert("Error deleting record", "error");
             }
-            const response = await fetch(`/table/${tableName}/delete_record`, {
-                method: "DELETE",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ primary_key: primaryKey })
-            });
-            const result = await response.json();
-            alert(result.message);
-            loadTableContents(tableName);
         }
 
         async function visualizeTable() {
             const tableName = document.getElementById("table-dropdown").value;
             if (!tableName) {
-                alert("Please select a table first.");
+                showAlert("Please select a table first", "error");
                 return;
             }
-            const response = await fetch(`/table/${tableName}/visualize`);
-            const result = await response.json();
-            alert(result.message);
+
+            try {
+                const response = await fetch(`/table/${tableName}/visualize`);
+                const result = await response.json();
+                if (response.ok) {
+                    showAlert(result.message, "success");
+                    showVisualization(result.image_path);
+                } else {
+                    showAlert(result.error, "error");
+                }
+            } catch (error) {
+                showAlert("Error visualizing table", "error");
+            }
         }
 
-        async function persistDatabase() {
-            const response = await fetch("/persist", { method: "POST" });
-            const result = await response.json();
-            alert(result.message);
+        function showVisualization(imagePath) {
+            const modal = document.getElementById("visualization-modal");
+            const content = document.getElementById("visualization-content");
+            
+            // Create image with timestamp to prevent caching
+            const timestamp = new Date().getTime();
+            content.innerHTML = `
+                <h3>B+ Tree Index Visualization</h3>
+                <div class="visualization-container">
+                    <img src="/visualizations/${imagePath}?t=${timestamp}" alt="B+ Tree Visualization">
+                </div>
+            `;
+            
+            modal.style.display = "block";
         }
+
+        function closeVisualizationModal() {
+            document.getElementById("visualization-modal").style.display = "none";
+        }
+
+        // Add event listener to close modal when clicking outside
+        window.addEventListener('click', function(event) {
+            const modal = document.getElementById("visualization-modal");
+            if (event.target === modal) {
+                closeVisualizationModal();
+            }
+        });
+
+        async function persistDatabase() {
+            try {
+                const response = await fetch("/persist", {
+                    method: "POST"
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    showAlert(result.message, "success");
+                } else {
+                    showAlert(result.error, "error");
+                }
+            } catch (error) {
+                showAlert("Error persisting database", "error");
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            disableOperations();
+            updateDatabaseStatus(null);
+            
+            // Add error handling for fetch calls
+            window.addEventListener('unhandledrejection', function(event) {
+                showAlert("Network error: " + event.reason, "error");
+            });
+        });
     </script>
-</head>
-<body onload="loadTables()">
-    <h1>Lightweight DBMS</h1>
-    <div class="container">
-        <div class="panel">
-            <h2>Tables</h2>
-            <select id="table-dropdown" onchange="loadTableDetails()"></select>
-            <button onclick="createTable()">Create Table</button>
-            <button onclick="deleteTable()">Delete Table</button>
-        </div>
-        <div class="panel">
-            <h2>Table Details</h2>
-            <pre id="table-details">Select a table to view details.</pre>
-            <h2>Table Contents</h2>
-            <pre id="table-contents">Select a table to view contents.</pre>
-        </div>
-        <div class="panel">
-            <h2>Actions</h2>
-            <textarea id="record-input" placeholder='{"column1": "value1", "column2": "value2"}' rows="5" style="width: 100%;"></textarea>
-            <button onclick="insertRecord()">Insert Record</button>
-            <button onclick="updateRecord()">Update Record</button>
-            <button onclick="deleteRecord()">Delete Record</button>
-            <button onclick="visualizeTable()">Visualize Index</button>
-            <button onclick="persistDatabase()">Persist Database</button>
-        </div>
-    </div>
 </body>
 </html>

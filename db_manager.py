@@ -43,28 +43,44 @@ class Database:
     
     def persist(self) -> None:
         """Persist all tables to disk."""
-        for table in self.tables.values():
+        # First ensure the database directory exists
+        os.makedirs(self.db_dir, exist_ok=True)
+        
+        # Save each table
+        for table_name, table in self.tables.items():
+            table.serialized_file = os.path.join(self.db_dir, f"{table_name}.pkl")
             table.persist()
-    
+
     def load(self) -> bool:
         """Load all tables from disk."""
-        # Get all .pkl files in the db directory
         try:
+            # Clear existing tables
+            self.tables.clear()
+            
+            # Get all .pkl files in the db directory
+            if not os.path.exists(self.db_dir):
+                return False
+                
             table_files = [f for f in os.listdir(self.db_dir) if f.endswith('.pkl')]
             
             for table_file in table_files:
                 table_name = table_file[:-4]  # Remove .pkl extension
-                temp_table = Table(table_name, {}, '')  # Create temp table to load
+                # Create temp table with proper file path
+                temp_table = Table(table_name, {}, '')
+                temp_table.serialized_file = os.path.join(self.db_dir, table_file)
+                
                 if temp_table.load():
-                    # After loading, we can get the actual columns and primary key
-                    first_record = temp_table.select_all()[0] if temp_table.select_all() else None
-                    if first_record:
-                        columns = {k: type(v) for k, v in first_record.items()}
-                        # Need to determine primary key - this is a limitation of this simple implementation
-                        # In a real system, we would store the schema separately
-                        primary_key = list(columns.keys())[0]  # Just use the first column as PK
-                        self.tables[table_name] = Table(table_name, columns, primary_key)
-                        self.tables[table_name].index = temp_table.index
+                    # Create a new table with the loaded schema
+                    self.tables[table_name] = Table(
+                        name=temp_table.name,
+                        columns=temp_table.columns,
+                        primary_key=temp_table.primary_key
+                    )
+                    # Set the correct serialized file path
+                    self.tables[table_name].serialized_file = os.path.join(self.db_dir, table_file)
+                    # Copy the loaded index
+                    self.tables[table_name].index = temp_table.index
+            
             return True
         except Exception as e:
             print(f"Error loading database: {e}")

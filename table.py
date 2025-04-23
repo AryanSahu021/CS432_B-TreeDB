@@ -8,8 +8,8 @@ class Table:
         self.name = name
         self.columns = columns
         self.primary_key = primary_key
-        self.index = BPlusTree(degree=3)  # Using our B+ Tree implementation
-        self.serialized_file = f"{name}.pkl"
+        self.index = BPlusTree(degree=3)
+        self.serialized_file = f"{name}.pkl"  # This will be updated by the Database class
     
     def insert(self, record: Dict[str, Any]) -> bool:
         """Insert a record into the table."""
@@ -78,6 +78,6 @@ class Table:
         except FileNotFoundError:
             return False
     
-    def visualize_index(self) -> None:
+    def visualize_index(self, filename: str) -> None:
         """Visualize the B+ tree index."""
-        self.index.visualize_tree(f"{self.name}_index")
+        self.index.visualize_tree(filename)
